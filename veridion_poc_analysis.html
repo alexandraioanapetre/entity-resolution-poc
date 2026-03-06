@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veridion POC — Entity Resolution & Data QC Report</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c26;
+    --border: #2a2a38;
+    --accent: #7c6af7;
+    --accent2: #e85d75;
+    --accent3: #38d9a9;
+    --accent4: #f7c948;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --text-dimmer: #555568;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 60px 60px 40px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -120px; left: -120px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(124,106,247,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-tag {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+  .header h1 span { color: var(--accent); }
+  .header-sub {
+    color: var(--text-dim);
+    font-size: 13px;
+    max-width: 600px;
+  }
+  .header-meta {
+    margin-top: 24px;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .meta-label { font-size: 10px; color: var(--text-dimmer); letter-spacing: 0.15em; text-transform: uppercase; }
+  .meta-val { font-size: 15px; font-weight: 500; color: var(--accent3); font-family: 'Syne', sans-serif; }
+
+  /* LAYOUT */
+  .main { padding: 48px 60px; max-width: 1400px; }
+
+  /* SECTION */
+  .section { margin-bottom: 56px; }
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* STAT GRID */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--accent-col, var(--accent));
+  }
+  .stat-card.green { --accent-col: var(--accent3); }
+  .stat-card.red { --accent-col: var(--accent2); }
+  .stat-card.yellow { --accent-col: var(--accent4); }
+  .stat-card.purple { --accent-col: var(--accent); }
+  .stat-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+    color: var(--accent-col, var(--accent));
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+  .stat-sublabel {
+    font-size: 10px;
+    color: var(--text-dimmer);
+    margin-top: 4px;
+  }
+
+  /* MATCH RATE VISUAL */
+  .match-visual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+    margin-bottom: 16px;
+  }
+  .match-bar-wrap { margin: 20px 0 10px; }
+  .match-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .match-bar {
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .match-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    width: 0;
+    transition: width 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .match-legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* REASON TABLE */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead tr {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    font-weight: 500;
+  }
+  td {
+    padding: 11px 16px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(124,106,247,0.04); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+  .badge-ok { background: rgba(56,217,169,0.12); color: var(--accent3); }
+  .badge-warn { background: rgba(247,201,72,0.12); color: var(--accent4); }
+  .badge-err { background: rgba(232,93,117,0.12); color: var(--accent2); }
+  .badge-info { background: rgba(124,106,247,0.12); color: var(--accent); }
+  .tag-subtle { color: var(--text-dimmer); font-size: 11px; }
+
+  /* TWO-COL */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+  }
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+  .card-title .dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    background: var(--dot-col, var(--accent));
+  }
+
+  /* BAR CHART */
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-item {}
+  .bar-meta { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .bar-name { font-size: 11px; color: var(--text-dim); }
+  .bar-count { font-size: 11px; color: var(--text); font-weight: 500; }
+  .bar-track { height: 4px; background: var(--surface2); }
+  .bar-fill { height: 4px; transition: width 1s ease; }
+
+  /* QC ISSUES */
+  .issue-list { display: flex; flex-direction: column; gap: 8px; }
+  .issue-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-left: 3px solid var(--issue-col, var(--accent));
+  }
+  .issue-row.warn { --issue-col: var(--accent4); }
+  .issue-row.err { --issue-col: var(--accent2); }
+  .issue-row.ok { --issue-col: var(--accent3); }
+  .issue-icon { font-size: 14px; width: 20px; text-align: center; }
+  .issue-text { flex: 1; }
+  .issue-title { font-size: 12px; color: var(--text); margin-bottom: 2px; }
+  .issue-desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+  .issue-count { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--issue-col, var(--accent)); }
+
+  /* MISMATCH TABLE */
+  .tag-country { font-size: 10px; padding: 1px 6px; background: var(--surface2); color: var(--text-dim); }
+
+  /* DECADE CHART */
+  .decade-bars { display: flex; align-items: flex-end; gap: 6px; height: 80px; margin-top: 12px; }
+  .decade-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .decade-bar { width: 100%; background: var(--accent); opacity: 0.6; transition: opacity 0.2s; min-height: 2px; }
+  .decade-bar:hover { opacity: 1; }
+  .decade-label { font-size: 9px; color: var(--text-dimmer); white-space: nowrap; }
+
+  /* FOOTER */
+  .footer {
+    padding: 32px 60px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dimmer);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .footer span { color: var(--accent); }
+
+  /* RECOMMENDATION BLOCK */
+  .reco-list { display: flex; flex-direction: column; gap: 12px; }
+  .reco-item {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 16px;
+    padding: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    align-items: start;
+  }
+  .reco-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .reco-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .reco-body { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+
+  /* animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .section { animation: fadeUp 0.5s ease both; }
+  .section:nth-child(1) { animation-delay: 0.05s; }
+  .section:nth-child(2) { animation-delay: 0.1s; }
+  .section:nth-child(3) { animation-delay: 0.15s; }
+  .section:nth-child(4) { animation-delay: 0.2s; }
+  .section:nth-child(5) { animation-delay: 0.25s; }
+  .section:nth-child(6) { animation-delay: 0.3s; }
+  .section:nth-child(7) { animation-delay: 0.35s; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-tag">Veridion · Data Analyst POC · Part 2</div>
+  <h1>Entity Resolution<br>&amp; <span>Data QC</span> Report</h1>
+  <p class="header-sub">Manual review results, match quality analysis, and data curation recommendations for the 760-company POC dataset.</p>
+  <div class="header-meta">
+    <div class="meta-item">
+      <span class="meta-label">Input Companies</span>
+      <span class="meta-val">760</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Candidates Reviewed</span>
+      <span class="meta-val">3,134</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Match Rate</span>
+      <span class="meta-val">71.7%</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Unmatched</span>
+      <span class="meta-val" style="color:var(--accent2)">215</span>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- SECTION 1: MATCH OVERVIEW -->
+  <section class="section">
+    <div class="section-title">01 — Match Overview</div>
+
+    <div class="stat-grid" style="margin-bottom:16px;">
+      <div class="stat-card green">
+        <div class="stat-val">545</div>
+        <div class="stat-label">Matched entities</div>
+        <div class="stat-sublabel">71.7% of input companies</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-val">215</div>
+        <div class="stat-label">Unmatched entities</div>
+        <div class="stat-sublabel">28.3% — engine gap or no entity found</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-val">4.1</div>
+        <div class="stat-label">Avg candidates / input</div>
+        <div class="stat-sublabel">Up to 5 per row reviewed</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-val">19</div>
+        <div class="stat-label">Duplicate Veridion IDs</div>
+        <div class="stat-sublabel">Same entity matched to 2+ inputs</div>
+      </div>
+    </div>
+
+    <div class="match-visual">
+      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:600;margin-bottom:4px;">Overall Match Rate</div>
+      <div class="tag-subtle" style="margin-bottom:0">Of 760 input company rows manually reviewed across all candidate options</div>
+      <div class="match-bar-wrap">
+        <div class="match-bar-label">
+          <span>0%</span><span>50%</span><span>100%</span>
+        </div>
+        <div class="match-bar">
+          <div class="match-bar-fill" id="matchFill"></div>
+        </div>
+      </div>
+      <div class="match-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>Matched (545 · 71.7%)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>Unmatched (215 · 28.3%)</div>
+      </div>
+    </div>
+
+    <!-- Why unmatched? -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Reason for Unmatched</th>
+            <th>Typical pattern</th>
+            <th>Approx. count</th>
+            <th>Severity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Engine data gap — no entity for regional subsidiary</td>
+            <td>Global parent exists; local branch not indexed</td>
+            <td>~110</td>
+            <td><span class="badge badge-warn">MEDIUM</span></td>
+          </tr>
+          <tr>
+            <td>All candidates co-located but different companies</td>
+            <td>Office building with multiple tenants at same address</td>
+            <td>~40</td>
+            <td><span class="badge badge-info">INFO</span></td>
+          </tr>
+          <tr>
+            <td>Name coincidence only — unrelated industry</td>
+            <td>Acronym or common word shared with input</td>
+            <td>~35</td>
+            <td><span class="badge badge-info">INFO</span></td>
+          </tr>
+          <tr>
+            <td>No candidates returned or all candidates irrelevant</td>
+            <td>Very small / niche companies, new entities</td>
+            <td>~20</td>
+            <td><span class="badge badge-err">HIGH</span></td>
+          </tr>
+          <tr>
+            <td>Corrupted input row (CSV parsing error)</td>
+            <td>Row key / country field contains description text</td>
+            <td>~10</td>
+            <td><span class="badge badge-err">HIGH</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 2: MATCH PATTERNS -->
+  <section class="section">
+    <div class="section-title">02 — Match Patterns & Decision Rules</div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="--dot-col:var(--accent3)"></span>Accepted Match Types</div>
+        <div class="table-wrap" style="border:none;">
+          <table>
+            <thead><tr><th>Pattern</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td>Exact address + name</td><td class="tag-subtle">SystemTeknik A/S → Sundsholmen 3</td></tr>
+              <tr><td>Legal name contains input name</td><td class="tag-subtle">Talend Inc. legal names include "Talend Singapore Pte. Ltd."</td></tr>
+              <tr><td>Global parent — subsidiary missing</td><td class="tag-subtle">Salesforce Inc. for SFDC Ireland Limited</td></tr>
+              <tr><td>Brand + country code phone match</td><td class="tag-subtle">ARY News → PK phones + Abdullah Haroon Rd</td></tr>
+              <tr><td>Parent-subsidiary insurance/holding</td><td class="tag-subtle">Salling Group A/S for Salling Group Forsikring A/S</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="--dot-col:var(--accent2)"></span>Rejection Patterns</div>
+        <div class="table-wrap" style="border:none;">
+          <table>
+            <thead><tr><th>Pattern</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td>Same address, different business</td><td class="tag-subtle">Escape Company at Mariane Thomsens Gade 2E</td></tr>
+              <tr><td>Name acronym coincidence</td><td class="tag-subtle">SAS Elektro ≠ SAS Institute AS</td></tr>
+              <tr><td>Unofficial site / blog about brand</td><td class="tag-subtle">SAP HANA blog ≠ SAP Danmark A/S</td></tr>
+              <tr><td>Independent partner using brand name</td><td class="tag-subtle">SAP Basis consultant ≠ SAP official entity</td></tr>
+              <tr><td>Bus stop / POI with company name</td><td class="tag-subtle">"Tech Mahindra" bus stop, Cyberjaya</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3: COUNTRY & INDUSTRY -->
+  <section class="section">
+    <div class="section-title">03 — Geographic & Industry Distribution</div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Input Countries (top 10)</div>
+        <div class="bar-list" id="countryBars"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="--dot-col:var(--accent4)"></span>Top Industries (matched)</div>
+        <div class="bar-list" id="industryBars"></div>
+      </div>
+    </div>
+    <div style="height:16px"></div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="--dot-col:var(--accent3)"></span>Company Age Distribution (year founded)</div>
+        <div class="tag-subtle" style="margin-bottom:12px">311 matched companies with known founding year</div>
+        <div class="decade-bars" id="decadeBars"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;">
+          <span class="tag-subtle">1820s</span>
+          <span class="tag-subtle">1950s</span>
+          <span class="tag-subtle">2020s</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="--dot-col:var(--accent2)"></span>Revenue &amp; Employee Data Coverage</div>
+        <div class="bar-list">
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Revenue data present</span><span class="bar-count">334 / 545</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:61.3%;background:var(--accent3)"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Employee count present</span><span class="bar-count">340 / 545</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:62.4%;background:var(--accent3)"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Revenue: extracted (high confidence)</span><span class="bar-count">154</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:46.1%;background:var(--accent)"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Revenue: modelled (estimated)</span><span class="bar-count">180</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:53.9%;background:var(--accent4)"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Employees: extracted</span><span class="bar-count">225</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:66.2%;background:var(--accent)"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Employees: modelled</span><span class="bar-count">115</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:33.8%;background:var(--accent4)"></div></div>
+          </div>
+          <div class="bar-item">
+            <div class="bar-meta"><span class="bar-name">Year founded present</span><span class="bar-count">311 / 545</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:57.1%;background:var(--accent3)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 4: DATA QC ISSUES -->
+  <section class="section">
+    <div class="section-title">04 — Data Quality Issues</div>
+
+    <div class="issue-list">
+      <div class="issue-row err">
+        <div class="issue-icon">⚠</div>
+        <div class="issue-text">
+          <div class="issue-title">CSV Parsing Corruption — Input Row Keys &amp; Country Fields</div>
+          <div class="issue-desc">~52 input rows have their <code>input_main_country</code> field populated with description text, NAICS codes, or industry labels (e.g. "Custom Computer Programming Services", "518210", "All Other Telecommunications"). These appear to be caused by a CSV delimiter conflict — the semicolons in <code>long_description</code> or <code>generated_description</code> shifted columns. Also affects <code>input_row_key</code> which contains sentence fragments. These rows are effectively unresolvable without raw data correction.</div>
+        </div>
+        <div class="issue-count">52</div>
+      </div>
+
+      <div class="issue-row warn">
+        <div class="issue-icon">⚡</div>
+        <div class="issue-text">
+          <div class="issue-title">Country Mismatch — Input vs. Matched Entity</div>
+          <div class="issue-desc">58 matched rows have a different country code for the input vs. the matched candidate. Most are intentional (regional subsidiary matched to global parent, e.g. Salesforce.com Singapore → Salesforce US). However, a minority represent ambiguous matches where a global HQ was used as a fallback because the local subsidiary was missing from the engine (e.g. Shields Environmental Group Ltd UK → Shields Environmental US). These should be flagged for client review.</div>
+        </div>
+        <div class="issue-count">58</div>
+      </div>
+
+      <div class="issue-row warn">
+        <div class="issue-icon">🔁</div>
+        <div class="issue-text">
+          <div class="issue-title">Duplicate Veridion IDs — Multiple Inputs Mapped to One Entity</div>
+          <div class="issue-desc">19 Veridion entity IDs were matched to 2 or more different input companies. Several are legitimate (e.g. a company + its branch both matching the same parent: Telenor ASA and Telenor Real Estate AS → both matched to "Telenor"). Others represent inputs that are actually distinct subsidiaries from different countries mapped to the same global parent due to engine gaps (e.g. 3 STEP IT AS Norway + 3 Step IT Sweden AB → 3Step IT Group Finland). Clients consuming this data may receive duplicate records for the same Veridion entity.</div>
+        </div>
+        <div class="issue-count">19</div>
+      </div>
+
+      <div class="issue-row warn">
+        <div class="issue-icon">💸</div>
+        <div class="issue-text">
+          <div class="issue-title">Revenue Outliers — Scale Normalization Issue</div>
+          <div class="issue-desc">The top revenue values are extremely large and appear to be in inconsistent units. Salling Group shows 10.1 trillion (likely 10.1 billion DKK reported in øre or wrong scale). Aviat Networks shows 244 billion (likely $244 million USD). These are consistent with a unit normalization bug — some values may be in local currency smallest units (øre, cents) while others are in whole currency. A conversion/normalization pass is required before any revenue-based analysis or client delivery.</div>
+        </div>
+        <div class="issue-count" style="font-size:12px;white-space:nowrap">Top 5<br>reviewed</div>
+      </div>
+
+      <div class="issue-row warn">
+        <div class="issue-icon">📭</div>
+        <div class="issue-text">
+          <div class="issue-title">Missing Contact Data in Matched Entities</div>
+          <div class="issue-desc">A significant share of matched companies are missing key contact and identity fields. 80 matched companies have no website, email, or phone at all — these are minimal stubs that may not be useful to the client. The missing data is concentrated in smaller regional entities, franchises, and subsidiaries where the engine has partial coverage.</div>
+        </div>
+        <div class="issue-count">80</div>
+      </div>
+
+      <div class="issue-row ok">
+        <div class="issue-icon">✓</div>
+        <div class="issue-text">
+          <div class="issue-title">No Multiple "Yes" Matches Per Input</div>
+          <div class="issue-desc">Every input company was matched to at most one candidate. No input has been accidentally given two "Yes" matches. The match logic is clean and consistent across all 3,134 candidate rows.</div>
+        </div>
+        <div class="issue-count">0</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5: COUNTRY MISMATCHES TABLE -->
+  <section class="section">
+    <div class="section-title">05 — Country Mismatch Detail (sample)</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Input Company</th>
+            <th>Input Country</th>
+            <th>Matched Entity</th>
+            <th>Match Country</th>
+            <th>Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="tag-subtle">1</td><td>SALESFORCE UK LIMITED</td><td><span class="tag-country">GB</span></td><td>Salesforce Asia</td><td><span class="tag-country">US</span></td><td class="tag-subtle">Global parent, UK subsidiary missing</td></tr>
+          <tr><td class="tag-subtle">2</td><td>SFDC IRELAND LIMITED</td><td><span class="tag-country">IE</span></td><td>Salesforce Inc.</td><td><span class="tag-country">US</span></td><td class="tag-subtle">Legal name "SFDC" confirmed; IE office verified</td></tr>
+          <tr><td class="tag-subtle">3</td><td>SALESFORCE.COM SINGAPORE PTE. LTD.</td><td><span class="tag-country">SG</span></td><td>Salesforce Inc.</td><td><span class="tag-country">US</span></td><td class="tag-subtle">SG location in candidate confirmed</td></tr>
+          <tr><td class="tag-subtle">4</td><td>Google Cloud EMEA Limited</td><td><span class="tag-country">IE</span></td><td>Google Cloud</td><td><span class="tag-country">US</span></td><td class="tag-subtle">IE subsidiary of US global entity</td></tr>
+          <tr><td class="tag-subtle">5</td><td>LINKEDIN IRELAND UNLIMITED COMPANY</td><td><span class="tag-country">IE</span></td><td>LinkedIn</td><td><span class="tag-country">US</span></td><td class="tag-subtle">EMEA entity, global parent matched</td></tr>
+          <tr><td class="tag-subtle">6</td><td>Kahoot! Denmark ApS</td><td><span class="tag-country">DK</span></td><td>Kahoot</td><td><span class="tag-country">NO</span></td><td class="tag-subtle">Norwegian HQ; DK branch not in engine</td></tr>
+          <tr><td class="tag-subtle">7</td><td>EWORK GROUP NORWAY AS</td><td><span class="tag-country">NO</span></td><td>Ework Group</td><td><span class="tag-country">SE</span></td><td class="tag-subtle">Swedish parent; NO branch missing</td></tr>
+          <tr><td class="tag-subtle">8</td><td>3 STEP IT AS</td><td><span class="tag-country">NO</span></td><td>3Step IT Group</td><td><span class="tag-country">FI</span></td><td class="tag-subtle">Finnish parent; NO subsidiary absent</td></tr>
+          <tr><td class="tag-subtle">9</td><td>HELP FORSIKRING, FILIAL AF …</td><td><span class="tag-country">DK</span></td><td>HELP Forsikring</td><td><span class="tag-country">NO</span></td><td class="tag-subtle">Norwegian HQ; Danish branch is a filial</td></tr>
+          <tr><td class="tag-subtle">10</td><td>AMDOCS DEVELOPMENT LIMITED</td><td><span class="tag-country">CY</span></td><td>Amdocs</td><td><span class="tag-country">US</span></td><td class="tag-subtle">Cyprus entity of US-headquartered Amdocs</td></tr>
+          <tr><td class="tag-subtle">11</td><td>TIETOEVRY TECH SERVICES NORWAY AS</td><td><span class="tag-country">NO</span></td><td>Tietoevry</td><td><span class="tag-country">FI</span></td><td class="tag-subtle">Finnish parent; NO subsidiary missing</td></tr>
+          <tr><td class="tag-subtle">12</td><td>Aviat Networks Japan LLC</td><td><span class="tag-country">JP</span></td><td>AVIAT NETWORKS</td><td><span class="tag-country">US</span></td><td class="tag-subtle">US parent; JP subsidiary absent from engine</td></tr>
+          <tr><td class="tag-subtle">13</td><td>NAGARRO AS</td><td><span class="tag-country">NO</span></td><td>Nagarro</td><td><span class="tag-country">DE</span></td><td class="tag-subtle">German parent; NO branch not indexed</td></tr>
+          <tr><td class="tag-subtle">14</td><td>QlikTech Nordic AB</td><td><span class="tag-country">SE</span></td><td>Qlik</td><td><span class="tag-country">US</span></td><td class="tag-subtle">US parent; SE Nordic entity matched to HQ</td></tr>
+          <tr><td class="tag-subtle">15</td><td>RED HAT LIMITED</td><td><span class="tag-country">IE</span></td><td>Red Hat</td><td><span class="tag-country">US</span></td><td class="tag-subtle">Irish entity of IBM/Red Hat US parent</td></tr>
+          <tr><td class="tag-subtle" colspan="6" style="text-align:center;color:var(--text-dimmer);padding:14px">... 43 more country mismatches (see full dataset)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 6: MISSING FIELDS -->
+  <section class="section">
+    <div class="section-title">06 — Missing Field Analysis (matched rows)</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Missing Count</th>
+            <th>Missing %</th>
+            <th>Present %</th>
+            <th>Client Impact</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>year_founded</code></td>
+            <td>234</td>
+            <td><span style="color:var(--accent2)">42.9%</span></td>
+            <td>57.1%</td>
+            <td class="tag-subtle">Moderate — useful for firmographic filtering</td>
+          </tr>
+          <tr>
+            <td><code>primary_email</code></td>
+            <td>215</td>
+            <td><span style="color:var(--accent2)">39.4%</span></td>
+            <td>60.6%</td>
+            <td class="tag-subtle">High — email is primary contact enrichment goal</td>
+          </tr>
+          <tr>
+            <td><code>revenue</code></td>
+            <td>211</td>
+            <td><span style="color:var(--accent2)">38.7%</span></td>
+            <td>61.3%</td>
+            <td class="tag-subtle">High — revenue is a key segmentation dimension</td>
+          </tr>
+          <tr>
+            <td><code>employee_count</code></td>
+            <td>205</td>
+            <td><span style="color:var(--accent2)">37.6%</span></td>
+            <td>62.4%</td>
+            <td class="tag-subtle">High — company size is essential for ICP matching</td>
+          </tr>
+          <tr>
+            <td><code>website_url</code></td>
+            <td>149</td>
+            <td><span style="color:var(--accent4)">27.3%</span></td>
+            <td>72.7%</td>
+            <td class="tag-subtle">Medium — needed for web presence verification</td>
+          </tr>
+          <tr>
+            <td><code>primary_phone</code></td>
+            <td>132</td>
+            <td><span style="color:var(--accent4)">24.2%</span></td>
+            <td>75.8%</td>
+            <td class="tag-subtle">Medium — direct outreach signal</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION 7: RECOMMENDATIONS -->
+  <section class="section">
+    <div class="section-title">07 — Curation Recommendations</div>
+    <div class="reco-list">
+      <div class="reco-item">
+        <div class="reco-num">01</div>
+        <div>
+          <div class="reco-title">Fix CSV parsing — re-export with proper quoting</div>
+          <div class="reco-body">The ~52 rows with corrupted country/key fields were caused by unescaped semicolons inside text fields (descriptions, tags). Re-export the source data with all text fields wrapped in double quotes, or switch to a non-conflicting delimiter (pipe <code>|</code> or tab). Before re-export, validate that all multi-value fields use a consistent internal separator that doesn't conflict with the CSV delimiter.</div>
+        </div>
+      </div>
+      <div class="reco-item">
+        <div class="reco-num">02</div>
+        <div>
+          <div class="reco-title">Normalize revenue to a single currency &amp; unit (USD, whole)</div>
+          <div class="reco-body">Revenue values are inconsistently scaled. Values like 10.1 trillion (Salling Group) and 244 billion (Aviat Networks) indicate a mix of local currency units, cent/øre denominations, and USD. Apply a normalization pipeline: (1) identify currency per entity from <code>main_country_code</code>, (2) convert smallest units to whole units, (3) apply FX conversion to USD. Flag modelled vs. extracted revenue with different confidence tiers.</div>
+        </div>
+      </div>
+      <div class="reco-item">
+        <div class="reco-num">03</div>
+        <div>
+          <div class="reco-title">Add a <code>match_confidence</code> field to distinguish match quality tiers</div>
+          <div class="reco-body">Not all "Yes" matches are equal. Recommend introducing a confidence tier: <strong>HIGH</strong> = exact address + name match; <strong>MEDIUM</strong> = global parent matched with confirmed regional presence (phone/email/location); <strong>LOW</strong> = global parent used as fallback with no regional confirmation. This lets clients downstream filter by confidence and prioritize HIGH-tier records for outreach.</div>
+        </div>
+      </div>
+      <div class="reco-item">
+        <div class="reco-num">04</div>
+        <div>
+          <div class="reco-title">Flag country mismatches as "parent match" rather than direct match</div>
+          <div class="reco-body">58 matches involve the input company being from a different country than the matched Veridion entity. Add a boolean field <code>is_parent_match</code> (or <code>match_type = "subsidiary_to_parent"</code>) so the client knows the exact entity they submitted is not in the engine — only the parent is. This is critical for clients who need jurisdiction-specific data (e.g., local regulatory compliance, correct legal entity for contracts).</div>
+        </div>
+      </div>
+      <div class="reco-item">
+        <div class="reco-num">05</div>
+        <div>
+          <div class="reco-title">Deduplicate Veridion ID reuse across inputs before client delivery</div>
+          <div class="reco-body">19 Veridion IDs are used for 2+ input rows. For the client output, either (a) deliver one record per Veridion ID and list all input companies that map to it, or (b) deliver one row per input but add a <code>duplicate_entity_flag</code> so the client can deduplicate themselves. Without this, the client may count the same company twice in their analytics or outreach lists.</div>
+        </div>
+      </div>
+      <div class="reco-item">
+        <div class="reco-num">06</div>
+        <div>
+          <div class="reco-title">Enrich or exclude 80 no-contact stub matches</div>
+          <div class="reco-body">80 matched entities have no website, email, or phone. These are essentially empty shells with only a name and geography. For client delivery, consider: (1) triggering a supplementary enrichment pass on these entities, or (2) downgrading them to "low confidence — uncontactable" status. Delivering these as full matches would inflate match rate without delivering actionable business intelligence.</div>
+        </div>
+      </div>
+      <div class="reco-item">
+        <div class="reco-num">07</div>
+        <div>
+          <div class="reco-title">Investigate engine coverage gap for regional subsidiaries</div>
+          <div class="reco-body">~110 of the 215 unmatched rows are cases where the global parent exists in the engine but the local subsidiary does not. This is the single largest source of unmatched records. Recommend a targeted engine coverage audit for the most common gap patterns: Nordic-country branches of global tech companies (SAP Danmark, TCS Sverige, Telenor LDI, Tech Mahindra Malaysia, etc.). A subsidiary indexing pass on these ~15 companies alone would recover ~30–40 unmatched rows.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div>Veridion POC · Data Analyst Assessment · Part 2 — <span>Data Analysis &amp; QC</span></div>
+  <div>760 companies · 3,134 candidates · Manual review completed</div>
+</footer>
+
+<script>
+  // Animate match bar
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      document.getElementById('matchFill').style.width = '71.7%';
+    }, 300);
+  });
+
+  // Country bars
+  const countries = [
+    { name: 'Denmark', n: 160, max: 160 },
+    { name: 'Norway', n: 91 },
+    { name: 'Unknown', n: 52 },
+    { name: 'Singapore', n: 48 },
+    { name: 'Malaysia', n: 43 },
+    { name: 'Sweden', n: 42 },
+    { name: 'UK', n: 28 },
+    { name: 'Pakistan', n: 26 },
+    { name: 'Thailand', n: 24 },
+    { name: 'USA', n: 23 },
+  ];
+  const maxC = 160;
+  const colors = ['#7c6af7','#e85d75','#38d9a9','#f7c948','#7c6af7','#38d9a9','#e85d75','#f7c948','#7c6af7','#38d9a9'];
+  const cb = document.getElementById('countryBars');
+  countries.forEach((c, i) => {
+    cb.innerHTML += `<div class="bar-item">
+      <div class="bar-meta"><span class="bar-name">${c.name}</span><span class="bar-count">${c.n}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(c.n/maxC*100).toFixed(1)}%;background:${colors[i]}"></div></div>
+    </div>`;
+  });
+
+  // Industry bars
+  const industries = [
+    { name: 'Telecommunication Services', n: 104 },
+    { name: 'Software & IT Services', n: 79 },
+    { name: 'Marketing & Advertising', n: 30 },
+    { name: 'Electrical & Electronic Eq.', n: 25 },
+    { name: 'Banks & Financial Services', n: 13 },
+    { name: 'Business Consulting', n: 12 },
+    { name: 'Insurance', n: 12 },
+    { name: 'HR Services', n: 11 },
+    { name: 'Finishing Contractors', n: 10 },
+    { name: 'Consumer Electronics', n: 7 },
+  ];
+  const maxI = 104;
+  const ib = document.getElementById('industryBars');
+  industries.forEach((ind, i) => {
+    ib.innerHTML += `<div class="bar-item">
+      <div class="bar-meta"><span class="bar-name">${ind.name}</span><span class="bar-count">${ind.n}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(ind.n/maxI*100).toFixed(1)}%;background:${colors[i]}"></div></div>
+    </div>`;
+  });
+
+  // Decade bars
+  const decades = [
+    {d:'1820s',n:1},{d:'1850s',n:2},{d:'1860s',n:2},{d:'1870s',n:1},{d:'1880s',n:1},
+    {d:'1890s',n:3},{d:'1900s',n:1},{d:'1910s',n:3},{d:'1920s',n:5},{d:'1930s',n:5},
+    {d:'1940s',n:4},{d:'1950s',n:7},{d:'1960s',n:12},{d:'1970s',n:12},{d:'1980s',n:27},
+    {d:'1990s',n:66},{d:'2000s',n:83},{d:'2010s',n:60},{d:'2020s',n:15},
+  ];
+  const maxD = Math.max(...decades.map(d => d.n));
+  const db = document.getElementById('decadeBars');
+  decades.forEach(d => {
+    const h = Math.max(2, Math.round((d.n / maxD) * 72));
+    db.innerHTML += `<div class="decade-col">
+      <div class="decade-bar" style="height:${h}px" title="${d.d}: ${d.n}"></div>
+    </div>`;
+  });
+</script>
+</body>
+</html>
